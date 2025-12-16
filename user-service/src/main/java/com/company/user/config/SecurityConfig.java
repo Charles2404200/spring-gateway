@@ -1,6 +1,5 @@
-package com.company.order.config;
+package com.company.user.config;
 
-import com.company.order.filter.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -8,24 +7,23 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Security Configuration for Order Service
+ * Security Configuration for User Service
  *
- * All endpoints require JWT authentication.
- * Only OPTIONS (pre-flight) requests are allowed without token.
+ * Public endpoints (no authentication required):
+ * - POST /users/login - User login
+ * - GET /users - List all users
+ * - GET /users/{id} - Get specific user
+ * - OPTIONS /* - CORS pre-flight requests
+ *
+ * This service is an authentication provider, so it doesn't enforce
+ * JWT validation on its own endpoints. Other services will validate
+ * tokens issued by this service.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    // Constructor injection - more explicit and testable
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -42,21 +40,19 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
 
-                // Authorization rules
+                // Authorization rules - User Service is public (no auth required)
                 .authorizeHttpRequests(authz -> authz
                         // Allow CORS pre-flight requests (OPTIONS)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ Protected endpoints - require JWT token
-                        .requestMatchers("/orders/**").authenticated()
+                        // ✅ Public endpoints - no authentication required
+                        .requestMatchers(HttpMethod.POST, "/users/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/users").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/users/**").permitAll()
 
-                        // Catch-all: deny all other requests
+                        // Deny all other requests
                         .anyRequest().denyAll()
                 )
-
-                // Add JWT filter BEFORE Spring's default authentication filter
-                // This ensures JWT is validated before other authentication mechanisms
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
                 // Exception handling for authentication/authorization errors
                 .exceptionHandling()
@@ -78,7 +74,4 @@ public class SecurityConfig {
         return http.build();
     }
 }
-
-
-
 

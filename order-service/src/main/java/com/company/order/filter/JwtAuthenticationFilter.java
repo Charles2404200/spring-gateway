@@ -6,10 +6,13 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -69,6 +72,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             System.out.println("✅ Token valid! UserId: " + userId + ", Username: " + username);
 
+            // ✅ Set authentication in Spring Security context
+            // This tells Spring Security: "This request is authenticated!"
+            UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(username, null, new ArrayList<>());
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
             // Store in request attributes for controller to use
             request.setAttribute("userId", userId);
             request.setAttribute("username", username);
@@ -84,6 +93,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 }
+
+
 
 
 
