@@ -1,0 +1,62 @@
+package com.company.user.dto;
+
+public class LoginResponse {
+    private String token;
+    private Long userId;
+    private String username;
+    private String email;
+    private Long expiresIn;
+
+    public LoginResponse() {
+    }
+
+    public LoginResponse(String token, Long userId, String username, String email, Long expiresIn) {
+        this.token = token;
+        this.userId = userId;
+        this.username = username;
+        this.email = email;
+        this.expiresIn = expiresIn;
+    }
+
+    // Getters and Setters
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public Long getExpiresIn() {
+        return expiresIn;
+    }
+
+    public void setExpiresIn(Long expiresIn) {
+        this.expiresIn = expiresIn;
+    }
+}
+
