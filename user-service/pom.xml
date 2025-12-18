@@ -15,6 +15,13 @@
 
     <dependencies>
 
+        <!-- Common Library (JWT Token Extraction Filter) -->
+        <dependency>
+            <groupId>com.company</groupId>
+            <artifactId>common</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
         <!-- SPRING MVC -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

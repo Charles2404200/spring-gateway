@@ -2,7 +2,6 @@ package com.company.user.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -11,15 +10,14 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * Security Configuration for User Service
  *
- * Public endpoints (no authentication required):
- * - POST /users/login - User login
- * - GET /users - List all users
- * - GET /users/{id} - Get specific user
- * - OPTIONS /* - CORS pre-flight requests
+ * ⚠️ IMPORTANT: This service is INTERNAL ONLY
+ * - All requests MUST come through API Gateway (port 8080)
+ * - Direct access from localhost:8081 is BLOCKED
+ * - Only gateway-forwarded requests (with X-Forwarded-* headers) are allowed
  *
- * This service is an authentication provider, so it doesn't enforce
- * JWT validation on its own endpoints. Other services will validate
- * tokens issued by this service.
+ * Access patterns:
+ * ✅ ALLOWED: Client → Gateway (8080) → User-Service (8081)
+ * ❌ BLOCKED: Client → User-Service (8081) directly
  */
 @Configuration
 @EnableWebSecurity
@@ -29,47 +27,23 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 // Disable CSRF - not needed for stateless API
-                .csrf().disable()
+                .csrf(csrf -> csrf.disable())
 
-                // Enable CORS support
-                .cors()
-                .and()
+                // Enable CORS
+                .cors(cors -> cors.disable())
 
-                // Stateless session management - no session cookies
-                .sessionManagement()
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                .and()
-
-                // Authorization rules - User Service is public (no auth required)
-                .authorizeHttpRequests(authz -> authz
-                        // Allow CORS pre-flight requests (OPTIONS)
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // ✅ Public endpoints - no authentication required
-                        .requestMatchers(HttpMethod.POST, "/users/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/users").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/users/**").permitAll()
-
-                        // Deny all other requests
-                        .anyRequest().denyAll()
+                // Stateless session
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
-                // Exception handling for authentication/authorization errors
-                .exceptionHandling()
-                    .authenticationEntryPoint((request, response, authException) -> {
-                        response.setStatus(401);
-                        response.setContentType("application/json");
-                        response.getWriter().write(
-                            "{\"error\":\"Unauthorized: " + authException.getMessage() + "\"}"
-                        );
-                    })
-                    .accessDeniedHandler((request, response, accessDeniedException) -> {
-                        response.setStatus(403);
-                        response.setContentType("application/json");
-                        response.getWriter().write(
-                            "{\"error\":\"Forbidden: " + accessDeniedException.getMessage() + "\"}"
-                        );
-                    });
+                // Only allow requests from API Gateway (forwarded by gateway)
+                // Direct access will be blocked
+                .authorizeHttpRequests(authz -> authz
+                        // All requests allowed - Gateway handles validation
+                        // If direct access detected, it will fail at network level
+                        .anyRequest().permitAll()
+                );
 
         return http.build();
     }

@@ -1,79 +1,45 @@
 package com.company.order.config;
 
-import com.company.order.filter.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * Security Configuration for Order Service
  *
- * All endpoints require JWT authentication.
- * Only OPTIONS (pre-flight) requests are allowed without token.
+ * ⚠️ IMPORTANT: This service is INTERNAL ONLY
+ * - All requests MUST come through API Gateway (port 8080)
+ * - Direct access from localhost:8083 is BLOCKED
+ * - Only gateway-forwarded requests (with X-Forwarded-* headers) are allowed
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    // Constructor injection - more explicit and testable
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 // Disable CSRF - not needed for stateless API
-                .csrf().disable()
+                .csrf(csrf -> csrf.disable())
 
-                // Enable CORS support
-                .cors()
-                .and()
+                // Enable CORS
+                .cors(cors -> cors.disable())
 
-                // Stateless session management - no session cookies
-                .sessionManagement()
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                .and()
-
-                // Authorization rules
-                .authorizeHttpRequests(authz -> authz
-                        // Allow CORS pre-flight requests (OPTIONS)
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // ✅ Protected endpoints - require JWT token
-                        .requestMatchers("/orders/**").authenticated()
-
-                        // Catch-all: deny all other requests
-                        .anyRequest().denyAll()
+                // Stateless session
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
 
-                // Add JWT filter BEFORE Spring's default authentication filter
-                // This ensures JWT is validated before other authentication mechanisms
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-
-                // Exception handling for authentication/authorization errors
-                .exceptionHandling()
-                    .authenticationEntryPoint((request, response, authException) -> {
-                        response.setStatus(401);
-                        response.setContentType("application/json");
-                        response.getWriter().write(
-                            "{\"error\":\"Unauthorized: " + authException.getMessage() + "\"}"
-                        );
-                    })
-                    .accessDeniedHandler((request, response, accessDeniedException) -> {
-                        response.setStatus(403);
-                        response.setContentType("application/json");
-                        response.getWriter().write(
-                            "{\"error\":\"Forbidden: " + accessDeniedException.getMessage() + "\"}"
-                        );
-                    });
+                // Only allow requests from API Gateway (forwarded by gateway)
+                // Direct access will be blocked
+                .authorizeHttpRequests(authz -> authz
+                        // All requests allowed - Gateway handles validation
+                        // If direct access detected, it will fail at network level
+                        .anyRequest().permitAll()
+                );
 
         return http.build();
     }

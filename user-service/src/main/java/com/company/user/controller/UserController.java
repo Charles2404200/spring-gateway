@@ -1,34 +1,40 @@
 package com.company.user.controller;
 
-import com.company.user.dto.LoginRequest;
-import com.company.user.dto.LoginResponse;
 import com.company.user.entity.User;
 import com.company.user.repository.UserRepository;
-import com.company.user.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+/**
+ * User Data Controller
+ *
+ * This controller only handles user data retrieval.
+ * Authentication (login/register) is handled by auth-service.
+ *
+ * This separation ensures:
+ * - Auth service is the single source for authentication
+ * - User service is only for user data management
+ * - Easier to scale and maintain
+ */
 @RestController
 @RequestMapping("/users")
+@CrossOrigin(origins = "*")
 public class UserController {
 
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
-
-    @Value("${jwt.expiration}")
-    private long jwtExpiration;
-
     /**
      * Get all users
+     *
+     * GET /users
      */
     @GetMapping
     public ResponseEntity<?> getAllUsers() {
@@ -37,52 +43,32 @@ public class UserController {
     }
 
     /**
-     * Login endpoint - generates JWT token
-     */
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
-        // Find user by username
-        Optional<User> user = userRepository.findByUsername(loginRequest.getUsername());
-
-        if (user.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body("Invalid username or password");
-        }
-
-        User foundUser = user.get();
-
-        // Validate password (in production, use password encoder)
-        if (!foundUser.getPassword().equals(loginRequest.getPassword())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body("Invalid username or password");
-        }
-
-        // Generate JWT token
-        String token = jwtUtil.generateToken(foundUser.getId(), foundUser.getUsername());
-
-        // Create response
-        LoginResponse response = new LoginResponse(
-                token,
-                foundUser.getId(),
-                foundUser.getUsername(),
-                foundUser.getEmail(),
-                jwtExpiration / 1000 // Convert milliseconds to seconds
-        );
-
-        return ResponseEntity.ok(response);
-    }
-
-    /**
      * Get user by ID
+     *
+     * GET /users/{id}
      */
     @GetMapping("/{id}")
     public ResponseEntity<?> getUserById(@PathVariable Long id) {
         Optional<User> user = userRepository.findById(id);
         if (user.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("User not found");
+                    .body(Map.of("error", "User not found"));
         }
         return ResponseEntity.ok(user.get());
+    }
+
+    /**
+     * Health check endpoint
+     *
+     * GET /users/health
+     */
+    @GetMapping("/health")
+    public ResponseEntity<?> health() {
+        return ResponseEntity.ok(Map.of(
+                "status", "UP",
+                "service", "user-service",
+                "message", "User service is running"
+        ));
     }
 }
 

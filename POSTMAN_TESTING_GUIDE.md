@@ -1,11 +1,58 @@
-# JWT Authentication Microservices - Postman Testing Guide
+# JWT Authentication Microservices - Testing Guide
 
 ## Architecture Overview
 
-- **User Service (Port 8081)**: Authentication service with login endpoint
-- **Order Service (Port 8082)**: Protected service requiring JWT validation
-- **API Gateway (Port 8080)**: Routes requests to microservices (no auth logic)
-- **Eureka Server (Port 8761)**: Service discovery (optional for testing)
+- **Auth Service (Port 8082)**: 
+  - **PUBLIC** - Client can login directly
+  - Handles: Login, Register, Token Validation
+  - Access: Direct from client OR via gateway
+
+- **User Service (Port 8081)**: 
+  - **INTERNAL** - Must access through gateway only
+  - Handles: User data retrieval
+  - Access: `http://localhost:8080/api/users` (via gateway)
+
+- **Order Service (Port 8083)**: 
+  - **INTERNAL** - Must access through gateway only
+  - Handles: Order data retrieval
+  - Access: `http://localhost:8080/api/orders` (via gateway)
+
+- **API Gateway (Port 8080)**: 
+  - Routes all requests to backend services
+  - Forward `/api/users/**` → User Service (8081)
+  - Forward `/api/orders/**` → Order Service (8083)
+  - Forward `/auth/**` → Auth Service (8082)
+
+## Access Patterns
+
+| Endpoint | Access Via | Notes |
+|---|---|---|
+| **Login** | Direct to 8082 OR via Gateway | ✅ PUBLIC |
+| **Get Orders** | Gateway only (8080) | ❌ NO direct access to 8083 |
+| **Get Users** | Gateway only (8080) | ❌ NO direct access to 8081 |
+
+```
+┌─────────────────┐
+│     CLIENT      │
+└────────┬────────┘
+         │
+    ┌────┴──────────────────────┬──────────┐
+    │                           │          │
+    ▼ (Public)                  ▼ (Via Gateway)
+ ┌────────────────┐          ┌──────────────┐
+ │ Auth Service   │          │ API Gateway  │
+ │   (8082)       │          │   (8080)     │
+ │ - login ✅     │          │              │
+ │ - register ✅  │          └──────┬───────┘
+ └────────────────┘                 │
+                          ┌─────────┴─────────┐
+                          ▼                   ▼
+                     ┌──────────┐        ┌──────────┐
+                     │ User Svc │        │ Order Svc│
+                     │ (8081)   │        │ (8083)   │
+                     │ INTERNAL │        │ INTERNAL │
+                     └──────────┘        └──────────┘
+```
 
 ---
 
@@ -26,33 +73,40 @@ Wait for the build to complete successfully.
 
 Open **4 separate PowerShell terminals** and run each command:
 
-### Terminal 1 - Eureka Server (Optional)
+### Terminal 1 - Auth Service (Required - handles all authentication)
 ```powershell
-cd C:\Users\leanh\IdeaProjects\spring-gateway\eureka-server
+cd C:\Users\leanh\IdeaProjects\spring-gateway\auth-service
 mvn spring-boot:run
 ```
-Expected output: `Tomcat started on port(s): 8761`
+Expected output: `Tomcat started on port(s): 8082` and `Sample users initialized!`
 
 ### Terminal 2 - User Service
 ```powershell
 cd C:\Users\leanh\IdeaProjects\spring-gateway\user-service
 mvn spring-boot:run
 ```
-Expected output: `Tomcat started on port(s): 8081` and `Sample users initialized!`
+Expected output: `Tomcat started on port(s): 8081`
 
 ### Terminal 3 - Order Service
 ```powershell
 cd C:\Users\leanh\IdeaProjects\spring-gateway\order-service
 mvn spring-boot:run
 ```
-Expected output: `Tomcat started on port(s): 8082` and `Sample orders initialized!`
+Expected output: `Tomcat started on port(s): 8083` and `Sample orders initialized!`
 
-### Terminal 4 - API Gateway
+### Terminal 4 - API Gateway (Optional)
 ```powershell
 cd C:\Users\leanh\IdeaProjects\spring-gateway\api-gateway
 mvn spring-boot:run
 ```
 Expected output: `Tomcat started on port(s): 8080`
+
+### Terminal 5 - Eureka Server (Optional)
+```powershell
+cd C:\Users\leanh\IdeaProjects\spring-gateway\eureka-server
+mvn spring-boot:run
+```
+Expected output: `Tomcat started on port(s): 8761` (not required for testing)
 
 ---
 
@@ -65,12 +119,10 @@ Expected output: `Tomcat started on port(s): 8080`
 
 ## Testing Cases
 
-### ✅ TEST CASE 1: User Login (Get JWT Token)
-
-**This is the FIRST test - you must do this to get a token!**
+### ✅ TEST CASE 1: User Login (PUBLIC - Direct to Auth Service)
 
 **Method**: POST  
-**URL**: `http://localhost:8081/users/login`
+**URL**: `http://localhost:8082/auth/login` **(Direct, NOT via gateway)**
 
 **Headers**:
 ```
@@ -88,7 +140,7 @@ Content-Type: application/json
 **Expected Response** (Status: 200 OK):
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2huIiwidXNlci1pZCI6MSwiaWF0IjoxNzAyNzc3NDAwLCJleHAiOjE3MDI3ODEwMDB9.xxxxx...",
+  "token": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJqb2huIiwidXNlci1pZCI6MSwiaWF0IjoxNzAyNzc3NDAwLCJleHAiOjE3MDI3ODEwMDB9.xxxxx...",
   "userId": 1,
   "username": "john",
   "email": "john@example.com",
@@ -102,12 +154,14 @@ Content-Type: application/json
 - Username: `jane`, Password: `password456` (userId: 2)
 - Username: `admin`, Password: `admin123` (userId: 3)
 
+**⚠️ Note**: This endpoint is PUBLIC - no gateway needed!
+
 ---
 
-### ✅ TEST CASE 2: Create Order (JWT Required)
+### ✅ TEST CASE 2: Create Order via Gateway (JWT Required)
 
 **Method**: POST  
-**URL**: `http://localhost:8082/orders`
+**URL**: `http://localhost:8080/api/orders`
 
 **Headers**:
 ```
@@ -136,13 +190,14 @@ Authorization: Bearer <PASTE_TOKEN_FROM_TEST_1>
 - ✅ Status is 201 Created
 - ✅ userId in response is 1 (from token)
 - ✅ Order details match your request
+- ✅ Request goes through Gateway (port 8080) then routed to Order Service (8083)
 
 ---
 
-### ✅ TEST CASE 3: Get All Orders for Current User (JWT Required)
+### ✅ TEST CASE 3: Get All Orders via Gateway (JWT Required)
 
 **Method**: GET  
-**URL**: `http://localhost:8082/orders`
+**URL**: `http://localhost:8080/api/orders`
 
 **Headers**:
 ```
@@ -176,13 +231,14 @@ Authorization: Bearer <PASTE_TOKEN_FROM_TEST_1>
 **What to check**:
 - ✅ All orders belong to userId 1
 - ✅ Shows both sample orders and newly created order
+- ✅ Request goes through Gateway (port 8080)
 
 ---
 
-### ✅ TEST CASE 4: Get Specific Order by ID (JWT Required)
+### ✅ TEST CASE 4: Get Specific Order via Gateway (JWT Required)
 
 **Method**: GET  
-**URL**: `http://localhost:8082/orders/1`
+**URL**: `http://localhost:8080/api/orders/1`
 
 **Headers**:
 ```
@@ -201,10 +257,10 @@ Authorization: Bearer <PASTE_TOKEN_FROM_TEST_1>
 
 ---
 
-### ✅ TEST CASE 5: Missing JWT Token (Error Test)
+### ✅ TEST CASE 5: Missing JWT Token via Gateway (Error Test)
 
 **Method**: GET  
-**URL**: `http://localhost:8082/orders`
+**URL**: `http://localhost:8080/api/orders`
 
 **Headers**: (Leave empty - NO Authorization header)
 
@@ -219,10 +275,10 @@ Missing or invalid Authorization header
 
 ---
 
-### ✅ TEST CASE 6: Invalid JWT Token (Error Test)
+### ✅ TEST CASE 6: Invalid JWT Token via Gateway (Error Test)
 
 **Method**: GET  
-**URL**: `http://localhost:8082/orders`
+**URL**: `http://localhost:8080/api/orders`
 
 **Headers**:
 ```
@@ -236,13 +292,13 @@ Token validation failed: Unable to read JSON value
 
 ---
 
-### ✅ TEST CASE 7: Access Other User's Order (Forbidden Test)
+### ✅ TEST CASE 7: Access Other User's Order via Gateway (Forbidden Test)
 
 **Step 1**: Login as `john` (Test Case 1) and get token
 **Step 2**: Try to access order ID 3 (which belongs to `jane`)
 
 **Method**: GET  
-**URL**: `http://localhost:8082/orders/3`
+**URL**: `http://localhost:8080/api/orders/3`
 
 **Headers**:
 ```
@@ -260,10 +316,10 @@ You are not authorized to access this order
 
 ---
 
-### ✅ TEST CASE 8: Get All Users (No Auth Required)
+### ✅ TEST CASE 8: Get All Users via Gateway (No Auth Required)
 
 **Method**: GET  
-**URL**: `http://localhost:8081/users`
+**URL**: `http://localhost:8080/api/users`
 
 **Headers**: (None required)
 
@@ -299,17 +355,17 @@ You can also test through the API Gateway (Port 8080) which routes to backend se
 
 **Login via Gateway**:
 ```
-POST http://localhost:8080/api/users/login
+POST http://localhost:8080/auth/login
 ```
 
 **Create Order via Gateway**:
 ```
-POST http://localhost:8080/api/orders
+POST http://localhost:8080/orders
 ```
 
 **Get Orders via Gateway**:
 ```
-GET http://localhost:8080/api/orders
+GET http://localhost:8080/orders
 ```
 
 ---
@@ -338,31 +394,36 @@ GET http://localhost:8080/api/orders
 
 If you prefer to use cURL instead:
 
-### Login:
+### Login (Direct to Auth Service):
 ```bash
-curl -X POST http://localhost:8081/users/login ^
+curl -X POST http://localhost:8082/auth/login ^
   -H "Content-Type: application/json" ^
   -d "{\"username\":\"john\",\"password\":\"password123\"}"
 ```
 
-### Create Order:
+### Create Order (Via Gateway):
 ```bash
-curl -X POST http://localhost:8082/orders ^
+curl -X POST http://localhost:8080/api/orders ^
   -H "Content-Type: application/json" ^
   -H "Authorization: Bearer YOUR_TOKEN_HERE" ^
   -d "{\"orderDetails\":\"Laptop\"}"
 ```
 
-### Get Orders:
+### Get Orders (Via Gateway):
 ```bash
-curl -X GET http://localhost:8082/orders ^
+curl -X GET http://localhost:8080/api/orders ^
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
-### Get Specific Order:
+### Get Specific Order (Via Gateway):
 ```bash
-curl -X GET http://localhost:8082/orders/1 ^
+curl -X GET http://localhost:8080/api/orders/1 ^
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+### Get All Users (Via Gateway):
+```bash
+curl -X GET http://localhost:8080/api/users
 ```
 
 ---
@@ -396,11 +457,11 @@ You can import this JSON into Postman:
           "raw": "{\n  \"username\": \"john\",\n  \"password\": \"password123\"\n}"
         },
         "url": {
-          "raw": "http://localhost:8081/users/login",
+          "raw": "http://localhost:8082/auth/login",
           "protocol": "http",
           "host": ["localhost"],
-          "port": "8081",
-          "path": ["users", "login"]
+          "port": "8082",
+          "path": ["auth", "login"]
         }
       }
     },
@@ -423,11 +484,11 @@ You can import this JSON into Postman:
           "raw": "{\n  \"orderDetails\": \"New Order: Laptop + Monitor\"\n}"
         },
         "url": {
-          "raw": "http://localhost:8082/orders",
+          "raw": "http://localhost:8080/api/orders",
           "protocol": "http",
           "host": ["localhost"],
-          "port": "8082",
-          "path": ["orders"]
+          "port": "8080",
+          "path": ["api", "orders"]
         }
       }
     },
@@ -442,11 +503,11 @@ You can import this JSON into Postman:
           }
         ],
         "url": {
-          "raw": "http://localhost:8082/orders",
+          "raw": "http://localhost:8080/api/orders",
           "protocol": "http",
           "host": ["localhost"],
-          "port": "8082",
-          "path": ["orders"]
+          "port": "8080",
+          "path": ["api", "orders"]
         }
       }
     },
@@ -461,11 +522,11 @@ You can import this JSON into Postman:
           }
         ],
         "url": {
-          "raw": "http://localhost:8082/orders/1",
+          "raw": "http://localhost:8080/api/orders/1",
           "protocol": "http",
           "host": ["localhost"],
-          "port": "8082",
-          "path": ["orders", "1"]
+          "port": "8080",
+          "path": ["api", "orders", "1"]
         }
       }
     },
@@ -474,11 +535,11 @@ You can import this JSON into Postman:
       "request": {
         "method": "GET",
         "url": {
-          "raw": "http://localhost:8081/users",
+          "raw": "http://localhost:8080/api/users",
           "protocol": "http",
           "host": ["localhost"],
-          "port": "8081",
-          "path": ["users"]
+          "port": "8080",
+          "path": ["api", "users"]
         }
       }
     }
@@ -520,8 +581,12 @@ Authorization: Bearer <YOUR_JWT_TOKEN>
 ✅ **Order Access Control**: Users can ONLY view/create their own orders
 
 ✅ **API Gateway Routes**:
-- `/api/users/**` → User Service (8081)
-- `/api/orders/**` → Order Service (8082)
+- `/auth/**` → Auth Service (8082)
+- `/api/auth/**` → Auth Service (8082) with /api prefix strip
+- `/users/**` → User Service (8081)
+- `/api/users/**` → User Service (8081) with /api prefix strip
+- `/orders/**` → Order Service (8083)
+- `/api/orders/**` → Order Service (8083) with /api prefix strip
 
 ---
 
