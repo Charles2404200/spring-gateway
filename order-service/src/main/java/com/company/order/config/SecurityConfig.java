@@ -7,14 +7,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
-/**
- * Security Configuration for Order Service
- *
- * ⚠️ IMPORTANT: This service is INTERNAL ONLY
- * - All requests MUST come through API Gateway (port 8080)
- * - Direct access from localhost:8083 is BLOCKED
- * - Only gateway-forwarded requests (with X-Forwarded-* headers) are allowed
- */
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {

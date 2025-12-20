@@ -7,18 +7,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
-/**
- * Security Configuration for User Service
- *
- * ⚠️ IMPORTANT: This service is INTERNAL ONLY
- * - All requests MUST come through API Gateway (port 8080)
- * - Direct access from localhost:8081 is BLOCKED
- * - Only gateway-forwarded requests (with X-Forwarded-* headers) are allowed
- *
- * Access patterns:
- * ✅ ALLOWED: Client → Gateway (8080) → User-Service (8081)
- * ❌ BLOCKED: Client → User-Service (8081) directly
- */
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {

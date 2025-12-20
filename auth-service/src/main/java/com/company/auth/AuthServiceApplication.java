@@ -45,7 +45,7 @@ public class AuthServiceApplication {
                 user3.setActive(true);
                 userRepository.save(user3);
 
-                System.out.println("✅ Sample users initialized!");
+                System.out.println(" Sample users initialized!");
             }
         };
     }
